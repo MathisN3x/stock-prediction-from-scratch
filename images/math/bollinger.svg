@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="140" viewBox="0 0 850 140">
+  <rect width="100%" height="100%" fill="white"/>
+  <text x="20" y="40" font-family="serif" font-size="18">Middle = SMA_n(t)</text>
+  <text x="20" y="74" font-family="serif" font-size="16">Std_n = sqrt((1/n) · sum_{i=0}^{n-1} (P_{t-i} - SMA_n(t))^2)</text>
+  <text x="20" y="108" font-family="serif" font-size="18">Upper = Middle + k · Std_n  ,  Lower = Middle - k · Std_n</text>
+</svg>
