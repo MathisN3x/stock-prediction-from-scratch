@@ -1,45 +1,69 @@
 # stock-prediction-from-scratch
 
-An educational Flask application for stock market forecasting. This project demonstrates how to fetch historical stock data, compute technical indicators, and make hybrid predictions using classical statistical methods and machine learning models.
+A simple, educational Flask application that demonstrates a reproducible pipeline for stock forecasting. This project shows how to download historical market data, create features, train models, evaluate them with time-series-aware methods, and serve predictions via a lightweight web app.
 
-## Rendered math formulas
+Goals
+- Provide a clear, minimal end-to-end example so readers can learn by reading and extending.
+- Keep code simple and well-documented so contributors can experiment with models and features.
+- Encourage reproducible experiments with deterministic data splits and clear instructions.
 
-This README uses rendered math images (SVG) for readability. The images are stored in images/math/ and referenced inline.
+What this repository contains
+- Scripts to download historical OHLCV (open, high, low, close, volume) data for tickers.
+- Utilities to compute commonly used features and indicators.
+- Example training scripts for baseline models (classical and machine learning).
+- A small Flask app to serve predictions and examples of how to call the model.
+- Documentation and examples for evaluation and experiment tracking.
 
-- Simple Moving Average (SMA):
+Quick start (local)
+1. Create and activate a virtual environment:
+   ```
+   python -m venv .venv
+   source .venv/bin/activate   # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-![SMA](images/math/sma.svg)
+2. Fetch example data:
+   ```
+   python src/fetch_data.py --ticker AAPL --start 2015-01-01 --end 2024-12-31 --out data/AAPL.csv
+   ```
 
-- Exponential Moving Average (EMA):
+3. Compute features:
+   ```
+   python src/features.py --input data/AAPL.csv --output data/AAPL_features.csv
+   ```
 
-![EMA](images/math/ema.svg)
+4. Train a model:
+   ```
+   python src/train.py --data data/AAPL_features.csv --model_dir models/aapl_baseline
+   ```
 
-- Relative Strength Index (RSI):
+5. Serve predictions with Flask:
+   ```
+   FLASK_APP=app.py flask run
+   # or
+   python app.py
+   ```
 
-![RSI](images/math/rsi.svg)
+Best practices and notes
+- Use time-aware train/validation/test splits (walk-forward or rolling windows) rather than random shuffles.
+- Fit scalers and any preprocessing using only training data, then apply to validation/test sets.
+- Track experiments: record parameter settings, data ranges, and random seeds to make results reproducible.
+- Start with simple baselines before moving to more complex models.
 
-- MACD:
+Project structure
+- app.py                 # Flask application
+- src/
+  - fetch_data.py        # data download utilities
+  - features.py          # feature engineering
+  - train.py             # training and evaluation scripts
+  - predict.py           # inference helpers
+- data/                  # raw and processed CSVs
+- models/                # saved model artifacts
+- requirements.txt
+- README.md
 
-![MACD](images/math/macd.svg)
+Contributing
+Contributions are welcome. Open an issue to discuss larger changes, or submit small, focused pull requests. Please include tests or clear usage notes for code additions.
 
-- Bollinger Bands:
-
-![Bollinger](images/math/bollinger.svg)
-
-- Loss functions (MSE, MAE, Huber):
-
-![Losses](images/math/losses.svg)
-
-## Problem statement (mathematical)
-
-Given historical price series {P_t}, we want to learn a function f that predicts a future quantity y_t (e.g., next-day close or return):
-
-- Predict next close price:
-  y_{t+1} = f(P_{t}, P_{t-1}, ..., X_{t}) + ε_t
-
-- Or predict log return:
-  r_{t} = log(P_{t} / P_{t-1}), and predict r_{t+1}.
-
-We treat this as a supervised regression problem: given inputs X_t (lags, indicators, volumes), learn f to minimize a regression loss.
-
-(Other sections omitted for brevity in the commit — this change only adds rendered math images and references.)
+License
+MIT
