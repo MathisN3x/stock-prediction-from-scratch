@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" viewBox="0 0 900 220">
-  <rect width="100%" height="100%" fill="white"/>
-  <text x="20" y="36" font-family="serif" font-size="18">Mean Squared Error (MSE):  MSE = (1/N) · sum_{i=1}^N (y_i - ŷ_i)^2</text>
-  <text x="20" y="76" font-family="serif" font-size="18">Mean Absolute Error (MAE):  MAE = (1/N) · sum_{i=1}^N |y_i - ŷ_i|</text>
-  <text x="20" y="116" font-family="serif" font-size="16">Huber loss L_δ(a) = { 0.5 a^2  if |a| ≤ δ ;  δ (|a| - 0.5 δ)  otherwise } where a = y - ŷ</text>
-  <text x="20" y="156" font-family="serif" font-size="14">RMSE = sqrt(MSE)  ,  MAPE = (100/N) · sum |(y_i - ŷ_i) / y_i|</text>
-</svg>

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="700" height="140" viewBox="0 0 700 140">
-  <rect width="100%" height="100%" fill="white"/>
-  <text x="20" y="36" font-family="serif" font-size="18">EMA_t = α · P_t + (1 - α) · EMA_{t-1}</text>
-  <text x="20" y="72" font-family="serif" font-size="16">with α = 2 / (n + 1)</text>
-  <text x="20" y="108" font-family="serif" font-size="14">EMA_t = \alpha P_t + (1-\alpha) EMA_{t-1}, \quad \alpha = \frac{2}{n+1}</text>
-</svg>
