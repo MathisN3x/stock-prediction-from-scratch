@@ -1,0 +1,173 @@
+<!-- templates/chart.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ ticker }} — Quant Dashboard</title>
+  <!-- Bootstrap for quick, responsive UI -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    body { background:#0f1720; color:#e6edf3; }
+    .app-card { background:#0b1220; padding:18px; border-radius:12px; box-shadow: 0 6px 18px rgba(0,0,0,0.6); }
+    canvas { width:100% !important; height:420px !important; }
+    .meta-chip { background:#081127; padding:8px 12px; border-radius:8px; margin-right:8px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">Quant Dashboard</a>
+      <form class="d-flex" role="search" onsubmit="gotoTicker(event)">
+        <input id="tickerInput" class="form-control me-2" type="search" placeholder="Ticker (ex: AAPL)" aria-label="Ticker" value="{{ ticker }}">
+        <button class="btn btn-outline-success" type="submit">Go</button>
+      </form>
+    </div>
+  </nav>
+
+  <div class="container my-4">
+    <div class="app-card">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">{{ ticker }} — Quant Dashboard</h4>
+        <div>
+          <button id="downloadCsv" class="btn btn-sm btn-secondary me-2">Download CSV</button>
+          <a href="/dashboard" class="btn btn-sm btn-outline-light">Back to Dashboard</a>
+        </div>
+      </div>
+
+      <canvas id="priceChart"></canvas>
+
+      <div class="row mt-3">
+        <div class="col-md-6">
+          <div class="input-group">
+            <label class="input-group-text">Period</label>
+            <select id="periodSel" class="form-select">
+              <option value="1mo" {% if period=='1mo' %}selected{% endif %}>1 month</option>
+              <option value="3mo" {% if period=='3mo' %}selected{% endif %}>3 months</option>
+              <option value="6mo" {% if period=='6mo' %}selected{% endif %}>6 months</option>
+              <option value="1y" {% if period=='1y' %}selected{% endif %}>1 year</option>
+            </select>
+            <button id="loadBtn" class="btn btn-primary">Load</button>
+          </div>
+        </div>
+        <div class="col-md-6 d-flex gap-2 align-items-center">
+          <label class="mb-0">Forecast (days)</label>
+          <input id="forecastDays" type="number" value="7" min="1" max="60" class="form-control" style="width:120px;">
+          <button id="forecastBtn" class="btn btn-info">Forecast</button>
+          <div id="meta" class="ms-3 d-flex align-items-center"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  const ticker = "{{ ticker }}";
+  let chart;
+
+  async function fetchData(period) {
+    const res = await fetch(`/data?ticker=${ticker}&period=${period}`);
+    if (!res.ok) {
+      alert('Error fetching data');
+      return null;
+    }
+    return await res.json();
+  }
+
+  function buildChart(labels, prices) {
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Close',
+          data: prices,
+          borderWidth: 2,
+          borderColor: '#1f6feb',
+          backgroundColor: 'rgba(31,111,235,0.05)',
+          tension: 0.15,
+          pointRadius: 0
+        }]
+      },
+      options: { interaction: { mode: 'index', intersect: false }, scales: { x: { display: true }, y: { display: true } }, plugins: { legend: { display: true } } }
+    });
+  }
+
+  async function load(period = '1mo') {
+    const data = await fetchData(period);
+    if (!data) return;
+    const labels = data.map(d => d.Date);
+    const prices = data.map(d => d.Close);
+    buildChart(labels, prices);
+    const last = prices[prices.length - 1];
+    const mean = (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2);
+  document.getElementById('meta').innerHTML = `<span class="meta-chip">Last: ${last}</span><span class="meta-chip">Average: ${mean}</span><span class="meta-chip">Period: ${period}</span>`;
+    // prepare CSV for download
+    window._latestData = data;
+  }
+
+  document.getElementById('loadBtn').addEventListener('click', () => {
+    const p = document.getElementById('periodSel').value;
+    load(p);
+  });
+
+  document.getElementById('forecastBtn').addEventListener('click', async () => {
+    const days = document.getElementById('forecastDays').value;
+    const period = document.getElementById('periodSel').value;
+    const res = await fetch(`/predict?ticker=${ticker}&period=${period}&days=${days}`);
+    const json = await res.json();
+    if (!json.forecast || json.forecast.length === 0) {
+      alert('Forecast unavailable');
+      return;
+    }
+
+    const f_labels = json.forecast.map(f => f.ds);
+    const f_values = json.forecast.map(f => f.yhat);
+
+    const baseLen = chart.data.labels.length;
+    chart.data.labels = [...chart.data.labels, ...f_labels];
+
+    // remove old Forecast dataset if present
+    chart.data.datasets = chart.data.datasets.filter(ds => ds.label !== 'Forecast');
+
+    chart.data.datasets.push({
+      label: 'Forecast',
+      data: [...Array(baseLen).fill(null), ...f_values],
+      borderColor: '#00eaff',
+      borderDash: [6, 4],
+      borderWidth: 2,
+      tension: 0.2,
+      pointRadius: 0
+    });
+
+    chart.update();
+    if (json.next_prediction !== null && json.next_prediction !== undefined) {
+      alert(`Forecast +${days} days: ${json.next_prediction}`);
+    }
+  });
+
+  function gotoTicker(e) {
+    e.preventDefault();
+    const t = document.getElementById('tickerInput').value.trim().toUpperCase();
+    if (!t) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('ticker', t);
+    window.location.search = params.toString();
+  }
+
+  document.getElementById('downloadCsv').addEventListener('click', () => {
+    const data = window._latestData || [];
+    if (!data.length) { alert('No data to download'); return; }
+    const csv = [Object.keys(data[0]).join(',')].concat(data.map(r => Object.values(r).join(','))).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${ticker}_${document.getElementById('periodSel').value}.csv`; a.click(); URL.revokeObjectURL(url);
+  });
+
+  window.onload = () => load('{{ period }}');
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

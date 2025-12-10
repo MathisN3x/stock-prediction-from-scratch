@@ -1,0 +1,232 @@
+<!-- templates/compare.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compare {{ ticker1 }} vs {{ ticker2 }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    body{font-family:Inter, sans-serif; background:#081220; color:#e6edf3; padding:16px;}
+    .card { background:#071426; padding:12px; border-radius:8px; }
+    /* Ensure form labels and controls are visible on dark background */
+    .form-check-label, .col-form-label, .form-label { color: #e6edf3; }
+    .form-select, .form-control { background: rgba(255,255,255,0.03); color: #e6edf3; border-color: rgba(255,255,255,0.08); }
+    .badge { background-color: rgba(255,255,255,0.06); color: #e6edf3; }
+  </style>
+</head>
+<body>
+  <div class="container my-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Compare</h3>
+      <div>
+  <a href="/chart?ticker={{ ticker1 }}" class="btn btn-sm btn-outline-light me-2">View {{ ticker1 }}</a>
+  <a href="/chart?ticker={{ ticker2 }}" class="btn btn-sm btn-outline-light">View {{ ticker2 }}</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row g-3 align-items-center mb-2">
+        <div class="col-md-3">
+          <label class="col-form-label form-label">Period</label>
+          <select id="periodSel" class="form-select">
+            <option value="1mo" {% if period=='1mo' %}selected{% endif %}>1 month</option>
+            <option value="3mo" {% if period=='3mo' %}selected{% endif %}>3 months</option>
+            <option value="6mo" {% if period=='6mo' %}selected{% endif %}>6 months</option>
+            <option value="1y" {% if period=='1y' %}selected{% endif %}>1 year</option>
+          </select>
+        </div>
+
+        <div class="col-md-3 d-flex align-items-center">
+          <div class="form-check me-3">
+            <input class="form-check-input" type="radio" name="norm" id="normAbsolute" value="absolute" checked>
+            <label class="form-check-label" for="normAbsolute">Absolute</label>
+          </div>
+          <div class="form-check me-3">
+            <input class="form-check-input" type="radio" name="norm" id="normIndexed" value="indexed">
+            <label class="form-check-label" for="normIndexed">Indexed (100)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="norm" id="normPct" value="pct">
+            <label class="form-check-label" for="normPct">% Change</label>
+          </div>
+        </div>
+
+        <div class="col-md-3 d-flex align-items-center">
+          <div class="form-check me-3">
+            <input class="form-check-input" type="checkbox" id="maToggle">
+            <label class="form-check-label" for="maToggle">Moving Avg</label>
+          </div>
+          <input id="maWindow" type="number" class="form-control" value="5" min="2" style="width:80px; background: rgba(255,255,255,0.03); color:#e6edf3; border-color: rgba(255,255,255,0.08);">
+        </div>
+
+        <div class="col-md-3 text-end">
+          <button id="reloadBtn" class="btn btn-primary">Reload</button>
+          <button id="downloadCsv" class="btn btn-outline-light">Download CSV</button>
+        </div>
+      </div>
+
+  <canvas id="cmpChart"></canvas>
+
+      <div class="p-3 d-flex justify-content-between align-items-center">
+        <div>
+          <label class="me-2">Show forecast:</label>
+          <input type="checkbox" id="forecast1" class="form-check-input me-1"><small>{{ ticker1 }}</small>
+          <input type="checkbox" id="forecast2" class="form-check-input ms-3 me-1"><small>{{ ticker2 }}</small>
+        </div>
+        <div>
+          <span class="badge bg-secondary" id="corrBadge">Correlation: —</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // Chart.js defaults for dark theme
+  Chart.defaults.color = '#e6edf3';
+  Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+
+  // utilities
+  function alignByDate(a, b) {
+    const mapA = new Map(a.map(r => [r.Date, r]));
+    const mapB = new Map(b.map(r => [r.Date, r]));
+    const common = Array.from(mapA.keys()).filter(d => mapB.has(d)).sort();
+    const outA = common.map(d => ({ Date: d, Close: mapA.get(d).Close }));
+    const outB = common.map(d => ({ Date: d, Close: mapB.get(d).Close }));
+    return [outA, outB];
+  }
+
+  function normalizeSeries(arr, mode) {
+    const vals = arr.map(x => parseFloat(x.Close));
+    if (mode === 'absolute') return vals;
+    if (mode === 'indexed') {
+      const base = vals[0] || 1;
+      return vals.map(v => (v / base) * 100);
+    }
+    if (mode === 'pct') {
+      const base = vals[0] || 1;
+      return vals.map(v => ((v - base) / base) * 100);
+    }
+    return vals;
+  }
+
+  function movingAverage(arr, window) {
+    const res = [];
+    for (let i = 0; i < arr.length; i++) {
+      if (i < window - 1) { res.push(null); continue; }
+      const slice = arr.slice(i - window + 1, i + 1);
+      const sum = slice.reduce((s, v) => s + v, 0);
+      res.push(sum / window);
+    }
+    return res;
+  }
+
+  function pearson(x, y) {
+    const n = x.length;
+    const mx = x.reduce((a, b) => a + b, 0) / n;
+    const my = y.reduce((a, b) => a + b, 0) / n;
+    let num = 0, dx = 0, dy = 0;
+    for (let i = 0; i < n; i++) {
+      num += (x[i] - mx) * (y[i] - my);
+      dx += (x[i] - mx) ** 2; dy += (y[i] - my) ** 2;
+    }
+    const den = Math.sqrt(dx * dy) || 1;
+    return num / den;
+  }
+
+  async function fetchData(ticker, period) {
+    const res = await fetch(`/data?ticker=${ticker}&period=${period}`);
+    if (!res.ok) throw new Error('fetch failed');
+    return await res.json();
+  }
+
+  let chart;
+
+  async function load() {
+    const period = document.getElementById('periodSel').value;
+    try {
+      const [d1, d2] = await Promise.all([fetchData('{{ ticker1 }}', period), fetchData('{{ ticker2 }}', period)]);
+      const [a1, a2] = alignByDate(d1, d2);
+      const mode = document.querySelector('input[name="norm"]:checked').value;
+      let s1 = normalizeSeries(a1, mode);
+      let s2 = normalizeSeries(a2, mode);
+
+      const maOn = document.getElementById('maToggle').checked;
+      const maW = parseInt(document.getElementById('maWindow').value) || 5;
+      const dates = a1.map(r => r.Date);
+
+      const datasets = [];
+      datasets.push({ label: '{{ ticker1 }}', data: s1, borderColor: '#1f6feb', tension: 0.15, spanGaps: true });
+      datasets.push({ label: '{{ ticker2 }}', data: s2, borderColor: '#ff7a59', tension: 0.15, spanGaps: true });
+
+      if (maOn) {
+        datasets.push({ label: `MA(${maW}) {{ ticker1 }}`, data: movingAverage(s1, maW), borderDash: [4,4], borderColor:'#7fb3ff', borderWidth:2, spanGaps:true });
+        datasets.push({ label: `MA(${maW}) {{ ticker2 }}`, data: movingAverage(s2, maW), borderDash: [4,4], borderColor:'#ffbfaa', borderWidth:2, spanGaps:true });
+      }
+
+      // compute correlation on non-null overlap
+      const validMask = s1.map((v, i) => v != null && s2[i] != null);
+      const x = s1.filter((v,i)=> validMask[i]);
+      const y = s2.filter((v,i)=> validMask[i]);
+      const corr = (x.length > 1) ? pearson(x, y) : null;
+      document.getElementById('corrBadge').textContent = `Correlation: ${corr !== null ? corr.toFixed(3) : '—'}`;
+
+      const ctx = document.getElementById('cmpChart').getContext('2d');
+  if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: dates, datasets },
+        options: { responsive: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top', labels: { color: '#e6edf3' } } }, scales: { x: { display: true, ticks: { color: '#e6edf3' }, grid: { color: 'rgba(255,255,255,0.03)' } }, y: { display: true, ticks: { color: '#e6edf3' }, grid: { color: 'rgba(255,255,255,0.03)' } } } }
+      });
+
+      // store latest aligned CSV
+      window._compareCsv = { dates, s1, s2 };
+    } catch (err) {
+      console.error(err);
+      alert('Error loading data.');
+    }
+  }
+
+  document.getElementById('reloadBtn').addEventListener('click', load);
+  document.getElementById('maToggle').addEventListener('change', load);
+  document.getElementById('maWindow').addEventListener('input', (e)=>{ if (document.getElementById('maToggle').checked) load(); });
+  document.querySelectorAll('input[name="norm"]').forEach(i=>i.addEventListener('change', load));
+  window.onload = load;
+
+  document.getElementById('downloadCsv').addEventListener('click', ()=>{
+    const data = window._compareCsv;
+    if (!data) { alert('No data'); return; }
+    const rows = ['Date,{{ ticker1 }},{{ ticker2 }}'];
+    for (let i=0;i<data.dates.length;i++) rows.push(`${data.dates[i]},${data.s1[i] ?? ''},${data.s2[i] ?? ''}`);
+    const blob = new Blob([rows.join('\n')], { type:'text/csv' });
+    const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`compare_{{ ticker1 }}_{{ ticker2 }}.csv`; a.click(); URL.revokeObjectURL(url);
+  });
+
+  // forecast toggles: fetch and overlay forecasts for each ticker
+  async function overlayForecast(ticker, color) {
+    const period = document.getElementById('periodSel').value;
+    const days = 7;
+    try {
+      const res = await fetch(`/predict?ticker=${ticker}&period=${period}&days=${days}`);
+      const json = await res.json();
+      if (!json.forecast || json.forecast.length===0) return;
+      const f_dates = json.forecast.map(f => f.ds);
+      const f_vals = json.forecast.map(f => f.yhat);
+      // extend labels if necessary
+      const labels = chart.data.labels.slice();
+      const baseLen = labels.length;
+      labels.push(...f_dates);
+      chart.data.labels = labels;
+      // add dataset for forecast
+      chart.data.datasets.push({ label: `Forecast ${ticker}`, data: [...Array(baseLen).fill(null), ...f_vals], borderColor: color, borderDash:[6,4], pointRadius:0 });
+      chart.update();
+    } catch (e) { console.error('forecast error', e); }
+  }
+
+  document.getElementById('forecast1').addEventListener('change', (e)=>{ if(e.target.checked) overlayForecast('{{ ticker1 }}','#1f6feb'); else load(); });
+  document.getElementById('forecast2').addEventListener('change', (e)=>{ if(e.target.checked) overlayForecast('{{ ticker2 }}','#ff7a59'); else load(); });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

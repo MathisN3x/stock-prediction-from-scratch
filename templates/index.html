@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quant Dashboard — Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        body { background:#071122; color:#e6edf3; }
+        .hero { padding:32px 0; text-align:center; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Quant Dashboard</a>
+            <div>
+                <a class="btn btn-sm btn-outline-light me-2" href="/">Home</a>
+                <a class="btn btn-sm btn-outline-light" href="/dashboard">Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container hero">
+    <h1 class="display-6">View and forecast prices</h1>
+    <p class="lead">Enter a ticker or open the multi-ticker dashboard.</p>
+        <form class="row g-2 justify-content-center" action="/">
+            <div class="col-auto">
+                <input name="ticker" class="form-control form-control-lg" placeholder="AAPL" value="AAPL">
+            </div>
+            <div class="col-auto">
+                <select name="period" class="form-select form-select-lg">
+                    <option value="1mo">1 month</option>
+                    <option value="3mo">3 months</option>
+                    <option value="6mo">6 months</option>
+                    <option value="1y">1 year</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary btn-lg">View</button>
+            </div>
+        </form>
+        <hr class="my-4" />
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card p-3 bg-dark text-light">
+                    <h5>Shortcuts</h5>
+                    <ul>
+                        <li><a href="/dashboard" class="link-light">Multi-ticker Dashboard</a></li>
+                        <li><a href="/compare" class="link-light">Compare two tickers</a></li>
+                        <li><a href="/docs" class="link-light">API docs</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card p-3 bg-dark text-light">
+                    <h5>Tip</h5>
+                    <p>Use the Forecast button on the chart page to overlay model predictions.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
