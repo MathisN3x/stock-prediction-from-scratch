@@ -1,4 +1,4 @@
-# Stock Insights — Technical Documentation
+# Stock Insights - Technical Documentation
 
 > **Stack:** Python 3 · Flask · yfinance · `ta` · scikit-learn · Prophet · Chart.js · Bootstrap 5  
 > **Entry point:** `app.py` — self-contained Flask backend  
